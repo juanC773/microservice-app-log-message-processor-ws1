@@ -20,11 +20,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # PASO 2: Instalar Python 3.6 (versión específica para compatibilidad)
+      # PASO 2: Instalar Python 3.9 (versión compatible con GitHub Actions)
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.6"  # Versión requerida por el proyecto
+          python-version: "3.9"  # Versión compatible con Ubuntu 24.04
 
       # PASO 3: Cache para dependencias pip (acelera builds futuros)
       - name: Cache pip dependencies
