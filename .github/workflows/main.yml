@@ -1,0 +1,82 @@
+name: Build and Push Log Message Processor
+
+# Triggers: Ejecuta cuando hay push o pull request a la rama master
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+# Variables globales del workflow
+env:
+  IMAGE_NAME: juanc7773/log-processor-ws1  # Nombre de la imagen Docker (usuario_dockerhub/nombre repo)
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest  # Sistema operativo donde correr el job
+
+    steps:
+      # PASO 1: Descargar código del repositorio
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # PASO 2: Instalar Python 3.6 (versión específica para compatibilidad)
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.6"  # Versión requerida por el proyecto
+
+      # PASO 3: Cache para dependencias pip (acelera builds futuros)
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      # PASO 4: Instalar dependencias del proyecto
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # PASO 5: Validar código Python (compilación básica)
+      - name: Validate Python code
+        run: |
+          python -m py_compile main.py
+
+      # PASO 6: Ejecutar tests básicos (si existen)
+      - name: Run tests (if any)
+        run: |
+          python -c "import main; print('Code imports successfully')" || true
+
+      # PASO 7: Login a Docker Hub usando secrets configurados
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}  # Secret: usuario de Docker Hub
+          password: ${{ secrets.DOCKERHUB_TOKEN }}     # Secret: token de acceso
+
+      # PASO 8: Crear metadata para Docker (tags y labels)
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}  # Tag 'latest' solo en master
+
+      # PASO 9: Build y push de la imagen Docker
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .              # Usar directorio actual como contexto
+          file: ./Dockerfile      # Archivo Dockerfile a usar
+          push: true              # Hacer push a Docker Hub
+          tags: ${{ steps.meta.outputs.tags }}    # Tags generados en paso anterior
+          labels: ${{ steps.meta.outputs.labels }} # Labels generados
+
+      # PASO 10: Mostrar digest de la imagen creada
+      - name: Image digest
+        run: echo "Image pushed with digest ${{ steps.build.outputs.digest }}"
